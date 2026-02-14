@@ -91,35 +91,48 @@ export function getDB(): Promise<IDBPDatabase<TrainingDB>> {
 
 // ===== Generic CRUD =====
 
-export async function getAll<T extends keyof TrainingDB>(
-  store: T
-): Promise<TrainingDB[T]['value'][]> {
+type StoreName = 'bodyParts' | 'exercises' | 'workoutLogs' | 'sets' | 'templates' | 'meta';
+
+export async function getAll(store: 'bodyParts'): Promise<BodyPart[]>;
+export async function getAll(store: 'exercises'): Promise<Exercise[]>;
+export async function getAll(store: 'workoutLogs'): Promise<WorkoutLog[]>;
+export async function getAll(store: 'sets'): Promise<WorkoutSet[]>;
+export async function getAll(store: 'templates'): Promise<Template[]>;
+export async function getAll(store: 'meta'): Promise<Meta[]>;
+export async function getAll(store: StoreName): Promise<unknown[]> {
   const db = await getDB();
-  return db.getAll(store);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return db.getAll(store as any);
 }
 
-export async function getById<T extends keyof TrainingDB>(
-  store: T,
-  key: TrainingDB[T]['key']
-): Promise<TrainingDB[T]['value'] | undefined> {
+export async function getById(store: 'bodyParts', key: string): Promise<BodyPart | undefined>;
+export async function getById(store: 'exercises', key: string): Promise<Exercise | undefined>;
+export async function getById(store: 'workoutLogs', key: string): Promise<WorkoutLog | undefined>;
+export async function getById(store: 'sets', key: string): Promise<WorkoutSet | undefined>;
+export async function getById(store: 'templates', key: number): Promise<Template | undefined>;
+export async function getById(store: 'meta', key: string): Promise<Meta | undefined>;
+export async function getById(store: StoreName, key: string | number): Promise<unknown | undefined> {
   const db = await getDB();
-  return db.get(store, key);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return db.get(store as any, key as any);
 }
 
-export async function put<T extends keyof TrainingDB>(
-  store: T,
-  value: TrainingDB[T]['value']
-): Promise<TrainingDB[T]['key']> {
+export async function put(store: 'bodyParts', value: BodyPart): Promise<string>;
+export async function put(store: 'exercises', value: Exercise): Promise<string>;
+export async function put(store: 'workoutLogs', value: WorkoutLog): Promise<string>;
+export async function put(store: 'sets', value: WorkoutSet): Promise<string>;
+export async function put(store: 'templates', value: Template): Promise<number>;
+export async function put(store: 'meta', value: Meta): Promise<string>;
+export async function put(store: StoreName, value: unknown): Promise<unknown> {
   const db = await getDB();
-  return db.put(store, value);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return db.put(store as any, value as any);
 }
 
-export async function deleteRecord<T extends keyof TrainingDB>(
-  store: T,
-  key: TrainingDB[T]['key']
-): Promise<void> {
+export async function deleteRecord(store: StoreName, key: string | number): Promise<void> {
   const db = await getDB();
-  return db.delete(store, key);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return db.delete(store as any, key as any);
 }
 
 // ===== Index queries =====

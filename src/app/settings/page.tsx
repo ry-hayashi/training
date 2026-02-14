@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { exportAll, importMerge, getMeta } from '@/lib/db';
 import type { BackupData, ImportResult } from '@/types';
 
@@ -11,11 +11,11 @@ export default function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Check last backup on mount
-  useState(() => {
+  useEffect(() => {
     getMeta('lastBackupAt').then((val) => {
       if (val) setLastBackup(val as string);
     });
-  });
+  }, []);
 
   const handleExport = async () => {
     try {
