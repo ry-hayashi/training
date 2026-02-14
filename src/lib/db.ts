@@ -238,7 +238,7 @@ export async function importMerge(backup: BackupData): Promise<ImportResult> {
   ) {
     const store = tx.objectStore(storeName);
     for (const item of items) {
-      const key = (item as Record<string, unknown>).id as TrainingDB[T]['key'];
+      const key = (item as unknown as Record<string, unknown>).id as TrainingDB[T]['key'];
       const existing = await store.get(key);
       if (!existing) {
         await store.put(item);
