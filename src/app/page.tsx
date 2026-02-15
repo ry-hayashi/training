@@ -19,11 +19,14 @@ export default function HomePage() {
     const [ex, bp] = await Promise.all([getAll('exercises'), getAll('bodyParts')]);
     setExercises(ex);
     setBodyParts(bp);
-    if (bp.length > 0 && !newBp) setNewBp(bp[0].id);
+    if (bp.length > 0) setNewBp((prev) => prev || bp[0].id);
     setLoading(false);
   };
-
-  useEffect(() => { load(); }, []);
+  
+    useEffect(() => {
+    const timer = setTimeout(load, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   const bodyPartMap = useMemo(
     () => new Map(bodyParts.map((bp) => [bp.id, bp.name])),
