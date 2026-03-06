@@ -65,7 +65,7 @@ function SaveTemplateModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-surface border-t border-border rounded-t-2xl p-5 space-y-4 slide-up">
+      <div className="w-full max-w-lg bg-surface border-t border-border rounded-t-2xl p-5 space-y-4 slide-up mb-[25vh]">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold">テンプレートに保存</h3>
           <button onClick={onClose} className="text-textMuted hover:text-textSecondary text-xl">✕</button>
