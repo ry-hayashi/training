@@ -10,6 +10,7 @@ import {
   formatVolume,
 } from '@/lib/aggregations';
 import type { WorkoutLog, WorkoutSet, Exercise, BodyPart, PeriodVolume } from '@/types';
+import { useRouter } from 'next/navigation';
 import {
   BarChart,
   Bar,
@@ -17,10 +18,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   LabelList,
-  Cell,
 } from 'recharts';
 
 type Mode = 'day' | 'week' | 'month';
@@ -72,6 +71,7 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export default function GraphPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>('week');
   const [logs, setLogs] = useState<WorkoutLog[]>([]);
   const [sets, setSets] = useState<WorkoutSet[]>([]);
@@ -233,23 +233,30 @@ export default function GraphPage() {
             {[...periods].reverse().slice(0, 8).map((p) => {
               const total = p.bodyParts.reduce((s, bpv) => s + bpv.volume, 0);
               if (total === 0) return null;
+              const isDay = mode === 'day';
               return (
                 <div
                   key={p.periodLabel}
-                  className="bg-surface border border-border rounded-xl px-4 py-3 space-y-2"
+                  onClick={isDay ? () => router.push(`/graph/day?date=${p.periodLabel}`) : undefined}
+                  className={`bg-surface border border-border rounded-xl px-4 py-3 space-y-2 ${
+                    isDay ? 'cursor-pointer hover:border-accent/40 hover:bg-surfaceHover transition-colors' : ''
+                  }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold font-mono">
                       {formatPeriodLabel(p.periodLabel, mode)}
                     </span>
-                    <span className="text-sm font-mono font-bold text-accent">
-                      {formatVolume(total)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono font-bold text-accent">
+                        {formatVolume(total)}
+                      </span>
+                      {isDay && <span className="text-textMuted text-xs">→</span>}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1">
                     {p.bodyParts
                       .filter((bpv) => bpv.volume > 0)
-                      .map((bpv, i) => {
+                      .map((bpv) => {
                         const colorIdx = activeBodyParts.findIndex(
                           (bp) => bp.name === bpv.bodyPartName
                         );
