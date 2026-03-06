@@ -3,13 +3,25 @@
 import { useEffect, useState, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getById, getLogsByExercise, getSetsByLog, put, getAll } from '@/lib/db';
-import { maxWeight, recentLogs, formatDate } from '@/lib/aggregations';
+import { maxWeight, recentLogs } from '@/lib/aggregations';
 import type { Exercise, BodyPart, WorkoutLog, WorkoutSet, LogWithSets } from '@/types';
 import { v4 } from 'uuid';
 
 interface SetInput {
   weight: string;
   reps: string;
+}
+
+// 日付を「2025/03/06 14:32」形式で表示
+function formatDatetime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function ExerciseDetailContent() {
@@ -55,7 +67,6 @@ function ExerciseDetailContent() {
 
   useEffect(() => { load(); }, [exerciseId]);
 
-  // Realtime volume computation
   const setVolumes = useMemo(
     () =>
       sets.map((s) => {
@@ -152,50 +163,62 @@ function ExerciseDetailContent() {
       <div className="bg-surface border border-border rounded-2xl p-4 space-y-3">
         <h2 className="font-semibold text-sm text-textSecondary">新規ログ</h2>
 
+        {/* ヘッダー行 */}
+        <div className="flex items-center gap-2 text-[10px] text-textMuted px-1">
+          <span className="w-5" />
+          <span className="flex-1 text-center">kg</span>
+          <span className="w-4" />
+          <span className="flex-1 text-center">回</span>
+          <span className="w-16 text-right">Vol</span>
+          <span className="w-5" />
+        </div>
+
         {sets.map((s, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className="text-xs text-textMuted w-6 text-right font-mono">{i + 1}</span>
+            <span className="text-xs text-textMuted w-5 text-right font-mono shrink-0">{i + 1}</span>
             <input
               type="number"
               inputMode="decimal"
-              placeholder="kg"
+              placeholder="0"
               value={s.weight}
               onChange={(e) => updateSet(i, 'weight', e.target.value)}
-              className="flex-1 bg-bg border border-border rounded-xl px-3 py-3 text-center font-mono text-lg focus:outline-none focus:border-accent"
+              className="flex-1 min-w-0 bg-bg border border-border rounded-xl px-2 py-3 text-center font-mono text-base focus:outline-none focus:border-accent"
             />
-            <span className="text-textMuted">×</span>
+            <span className="text-textMuted shrink-0">×</span>
             <input
               type="number"
               inputMode="numeric"
-              placeholder="回"
+              placeholder="0"
               value={s.reps}
               onChange={(e) => updateSet(i, 'reps', e.target.value)}
-              className="flex-1 bg-bg border border-border rounded-xl px-3 py-3 text-center font-mono text-lg focus:outline-none focus:border-accent"
+              className="flex-1 min-w-0 bg-bg border border-border rounded-xl px-2 py-3 text-center font-mono text-base focus:outline-none focus:border-accent"
             />
-            <div className="w-20 text-right text-sm font-mono text-textSecondary">
+            <span className="w-16 shrink-0 text-right text-sm font-mono text-textSecondary">
               {setVolumes[i] > 0 ? setVolumes[i].toLocaleString() : '—'}
-            </div>
-            {sets.length > 1 && (
-              <button
-                onClick={() => removeSetRow(i)}
-                className="text-textMuted hover:text-danger text-lg w-6"
-              >
-                ×
-              </button>
-            )}
+            </span>
+            <span className="w-5 shrink-0">
+              {sets.length > 1 && (
+                <button
+                  onClick={() => removeSetRow(i)}
+                  className="text-textMuted hover:text-danger text-base leading-none"
+                >
+                  ×
+                </button>
+              )}
+            </span>
           </div>
         ))}
 
         <div className="flex items-center justify-between pt-1">
-          {sets.length < 5 && (
+          {sets.length < 5 ? (
             <button
               onClick={addSetRow}
               className="text-accent text-sm font-medium hover:text-accentHover"
             >
               ＋ セット追加
             </button>
-          )}
-          <div className="text-right flex-1">
+          ) : <span />}
+          <div className="text-right">
             <span className="text-xs text-textMuted">総Volume: </span>
             <span className="font-mono font-bold text-lg">
               {totalVolume > 0 ? totalVolume.toLocaleString() : '—'}
@@ -212,7 +235,7 @@ function ExerciseDetailContent() {
         </button>
       </div>
 
-      {/* Recent 3 logs */}
+      {/* Recent logs */}
       <div className="space-y-2">
         <h2 className="font-semibold text-sm text-textSecondary">直近3回</h2>
         {recent.length === 0 ? (
@@ -224,7 +247,10 @@ function ExerciseDetailContent() {
               className="bg-surface border border-border rounded-xl p-4 space-y-2"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs text-textMuted">{formatDate(log.performedAtISO)}</span>
+                {/* 日付・時刻を表示 */}
+                <span className="text-xs text-textMuted font-mono">
+                  {formatDatetime(log.performedAtISO)}
+                </span>
                 <span className="font-mono font-bold text-sm">
                   Vol: {log.totalVolume.toLocaleString()}
                 </span>
