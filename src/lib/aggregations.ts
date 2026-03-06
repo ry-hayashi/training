@@ -50,15 +50,19 @@ export function recentLogs(
   return sorted.slice(0, n).map((log) => enrichLog(log, allSets));
 }
 
-/** Get ISO week string "YYYY-Www" */
-function getISOWeek(dateStr: string): string {
+/** Get date string "YYYY-MM-DD" from ISO */
+function getDateKey(dateStr: string): string {
   const d = new Date(dateStr);
-  const jan4 = new Date(d.getFullYear(), 0, 4);
-  const dayOfYear = Math.floor(
-    (d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000
-  );
-  const weekNum = Math.ceil((dayOfYear + jan4.getDay() + 1) / 7);
-  return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Get Sunday-based week start date string "YYYY-MM-DD" */
+function getSundayWeekKey(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = d.getDay(); // 0=Sun
+  const sunday = new Date(d);
+  sunday.setDate(d.getDate() - day);
+  return getDateKey(sunday.toISOString());
 }
 
 /** Get month string "YYYY-MM" */
@@ -67,79 +71,96 @@ function getMonth(dateStr: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-/** Compute body part volumes grouped by week */
+/** Common aggregation logic */
+function aggregateByKey(
+  logs: WorkoutLog[],
+  sets: WorkoutSet[],
+  exercises: Exercise[],
+  bodyParts: BodyPart[],
+  keyFn: (iso: string) => string
+): PeriodVolume[] {
+  const exerciseMap = new Map(exercises.map((e) => [e.id, e]));
+
+  const periodMap = new Map<string, Map<string, number>>();
+
+  for (const log of logs) {
+    const key = keyFn(log.performedAtISO);
+    const ex = exerciseMap.get(log.exerciseId);
+    if (!ex) continue;
+
+    const logSets = sets.filter((s) => s.logId === log.id);
+    const vol = logSets.reduce((sum, s) => sum + s.weight * s.reps, 0);
+
+    if (!periodMap.has(key)) periodMap.set(key, new Map());
+    const bpMap = periodMap.get(key)!;
+    bpMap.set(ex.bodyPartId, (bpMap.get(ex.bodyPartId) || 0) + vol);
+  }
+
+  const keys = Array.from(periodMap.keys()).sort();
+  return keys.map((key) => {
+    const bpMap = periodMap.get(key)!;
+    const bodyPartVolumes: BodyPartVolume[] = bodyParts.map((bp) => ({
+      bodyPartId: bp.id,
+      bodyPartName: bp.name,
+      volume: bpMap.get(bp.id) || 0,
+    }));
+    return { periodLabel: key, bodyParts: bodyPartVolumes };
+  });
+}
+
+/** Compute body part volumes grouped by day */
+export function bodyPartVolumeByDay(
+  logs: WorkoutLog[],
+  sets: WorkoutSet[],
+  exercises: Exercise[],
+  bodyParts: BodyPart[]
+): PeriodVolume[] {
+  return aggregateByKey(logs, sets, exercises, bodyParts, getDateKey);
+}
+
+/** Compute body part volumes grouped by Sunday-based week */
 export function bodyPartVolumeByWeek(
   logs: WorkoutLog[],
   sets: WorkoutSet[],
   exercises: Exercise[],
   bodyParts: BodyPart[]
 ): PeriodVolume[] {
-  const exerciseMap = new Map(exercises.map((e) => [e.id, e]));
-  const bodyPartMap = new Map(bodyParts.map((bp) => [bp.id, bp]));
-
-  // Group logs by week
-  const weekMap = new Map<string, Map<string, number>>();
-
-  for (const log of logs) {
-    const week = getISOWeek(log.performedAtISO);
-    const ex = exerciseMap.get(log.exerciseId);
-    if (!ex) continue;
-
-    const logSets = sets.filter((s) => s.logId === log.id);
-    const vol = logSets.reduce((sum, s) => sum + s.weight * s.reps, 0);
-
-    if (!weekMap.has(week)) weekMap.set(week, new Map());
-    const bpMap = weekMap.get(week)!;
-    bpMap.set(ex.bodyPartId, (bpMap.get(ex.bodyPartId) || 0) + vol);
-  }
-
-  // Convert to array, sorted
-  const weeks = Array.from(weekMap.keys()).sort();
-  return weeks.map((week) => {
-    const bpMap = weekMap.get(week)!;
-    const bodyPartVolumes: BodyPartVolume[] = bodyParts.map((bp) => ({
-      bodyPartId: bp.id,
-      bodyPartName: bp.name,
-      volume: bpMap.get(bp.id) || 0,
-    }));
-    return { periodLabel: week, bodyParts: bodyPartVolumes };
-  });
+  return aggregateByKey(logs, sets, exercises, bodyParts, getSundayWeekKey);
 }
 
-/** Same as above but by month */
+/** Compute body part volumes grouped by month */
 export function bodyPartVolumeByMonth(
   logs: WorkoutLog[],
   sets: WorkoutSet[],
   exercises: Exercise[],
   bodyParts: BodyPart[]
 ): PeriodVolume[] {
-  const exerciseMap = new Map(exercises.map((e) => [e.id, e]));
+  return aggregateByKey(logs, sets, exercises, bodyParts, getMonth);
+}
 
-  const monthMap = new Map<string, Map<string, number>>();
-
-  for (const log of logs) {
-    const month = getMonth(log.performedAtISO);
-    const ex = exerciseMap.get(log.exerciseId);
-    if (!ex) continue;
-
-    const logSets = sets.filter((s) => s.logId === log.id);
-    const vol = logSets.reduce((sum, s) => sum + s.weight * s.reps, 0);
-
-    if (!monthMap.has(month)) monthMap.set(month, new Map());
-    const bpMap = monthMap.get(month)!;
-    bpMap.set(ex.bodyPartId, (bpMap.get(ex.bodyPartId) || 0) + vol);
+/** Format period label for display on chart axis */
+export function formatPeriodLabel(label: string, mode: 'day' | 'week' | 'month'): string {
+  if (mode === 'day') {
+    // "YYYY-MM-DD" → "M/D"
+    const [, m, d] = label.split('-');
+    return `${parseInt(m)}/${parseInt(d)}`;
   }
+  if (mode === 'week') {
+    // Sunday date "YYYY-MM-DD" → "M/D〜"
+    const [, m, d] = label.split('-');
+    return `${parseInt(m)}/${parseInt(d)}〜`;
+  }
+  if (mode === 'month') {
+    // "YYYY-MM" → "YYYY/MM"
+    const [y, m] = label.split('-');
+    return `${y}/${m}`;
+  }
+  return label;
+}
 
-  const months = Array.from(monthMap.keys()).sort();
-  return months.map((month) => {
-    const bpMap = monthMap.get(month)!;
-    const bodyPartVolumes: BodyPartVolume[] = bodyParts.map((bp) => ({
-      bodyPartId: bp.id,
-      bodyPartName: bp.name,
-      volume: bpMap.get(bp.id) || 0,
-    }));
-    return { periodLabel: month, bodyParts: bodyPartVolumes };
-  });
+/** Format volume for display (always kg with comma) */
+export function formatVolume(v: number): string {
+  return `${v.toLocaleString('ja-JP')}kg`;
 }
 
 /** Format date string for display */
